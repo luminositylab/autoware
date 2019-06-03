@@ -20,11 +20,16 @@
 // C++ includes
 #include <string>
 #include <memory>
+#include <sstream>
+
 
 // ROS includes
 #include <ros/ros.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <nmea_msgs/Sentence.h>
+#include <ublox_msgs/NavATT.h>
+#include <sensor_msgs/NavSatFix.h>
+
 #include <tf/transform_broadcaster.h>
 
 #include <gnss/geo_pos_conv.hpp>
@@ -40,21 +45,22 @@ public:
   void run();
 
 private:
-  // handle
+  //!! handle
   ros::NodeHandle nh_;
   ros::NodeHandle private_nh_;
 
-  // publisher
+  //!! publisher
   ros::Publisher pub1_;
 
-  // subscriber
-  ros::Subscriber sub1_;
-
-  // constants
+  //!! subscriber
+  // ros::Subscriber sub1_;
+  ros::Subscriber sub2_;
+  ros::Subscriber sub3_;
+  //!! constants
   const std::string MAP_FRAME_;
   const std::string GPS_FRAME_;
 
-  // variables
+  //!! variables
   int32_t plane_number_;
   geo_pos_conv geo_;
   geo_pos_conv last_geo_;
@@ -63,20 +69,28 @@ private:
   ros::Time current_time_, orientation_stamp_;
   tf::TransformBroadcaster br_;
 
-  // callbacks
-  void callbackFromNmeaSentence(const nmea_msgs::Sentence::ConstPtr &msg);
-
+  //!! callbacks
+  // void callbackFromNmeaSentence(const nmea_msgs::Sentence::ConstPtr &msg);
+  // callback for position message from ublox
+  void callbackFromNAVSATFIX(const sensor_msgs::NavSatFix::ConstPtr &msg);
+  // callback for pose message from ublox
+  void callbackFromNAVATT(const ublox_msgs::NavATT::ConstPtr &msg);
   // initializer
   void initForROS();
 
-  // functions
+  //!! functions
   void publishPoseStamped();
   void publishTF();
   void createOrientation();
-  void convert(std::vector<std::string> nmea, ros::Time current_stamp);
+  // void convert(std::vector<std::string> nmea, ros::Time current_stamp);
+  // parse sensor_msgs/NavSatFix lat&lon&alt to geo_
+  void parsepos(const sensor_msgs::NavSatFix::ConstPtr &pos);
+  // parse ublox_msgs/NavAtt roll&pitch&yaw to geo_
+  void parserpy(const ublox_msgs::NavATT::ConstPtr &rpy);
+
 };
 
 std::vector<std::string> split(const std::string &string);
 
-}  // gnss_localizer
+}  //!! gnss_localizer
 #endif  // NMEA2TFPOSE_CORE_H
