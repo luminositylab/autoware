@@ -32,6 +32,7 @@ Nmea2TFPoseNode::Nmea2TFPoseNode()
   , orientation_stamp_(0)
 {
   initForROS();
+  // initialize the plane(lat&lon) for a rough global position 
   geo_.set_plane(plane_number_);
 }
 
@@ -46,8 +47,9 @@ void Nmea2TFPoseNode::initForROS()
   private_nh_.getParam("plane", plane_number_);
 
   // setup subscriber
-  sub1_ = nh_.subscribe("nmea_sentence", 100, &Nmea2TFPoseNode::callbackFromNmeaSentence, this);
-
+  // sub1_ = nh_.subscribe("nmea_sentence", 100, &Nmea2TFPoseNode::callbackFromNmeaSentence, this);
+  sub2_ = nh_.subscribe("/evk_m8u/fix", 100, &Nmea2TFPoseNode::callbackFromNAVSATFIX, this);
+  sub3_ = nh_.subscribe("/evk_m8u/navatt", 100, &Nmea2TFPoseNode::callbackFromNAVATT, this);
   // setup publisher
   pub1_ = nh_.advertise<geometry_msgs::PoseStamped>("gnss_pose", 10);
 }
@@ -86,79 +88,147 @@ void Nmea2TFPoseNode::createOrientation()
   pitch_ = 0;
 }
 
-void Nmea2TFPoseNode::convert(std::vector<std::string> nmea, ros::Time current_stamp)
+// void Nmea2TFPoseNode::convert(std::vector<std::string> nmea, ros::Time current_stamp)
+// {
+//   try
+//   {
+//     if (nmea.at(0).compare(0, 2, "QQ") == 0)
+//     {
+//       orientation_time_ = std::stod(nmea.at(3));
+//       roll_ = std::stod(nmea.at(4)) * M_PI / 180.;
+//       pitch_ = -1 * std::stod(nmea.at(5)) * M_PI / 180.;
+//       yaw_ = -1 * std::stod(nmea.at(6)) * M_PI / 180. + M_PI / 2;
+//       orientation_stamp_ = current_stamp;
+//       ROS_INFO("QQ is subscribed.");
+//     }
+//     else if (nmea.at(0) == "$PASHR")
+//     {
+//       orientation_time_ = std::stod(nmea.at(1));
+//       roll_ = std::stod(nmea.at(4)) * M_PI / 180.;
+//       pitch_ = -1 * std::stod(nmea.at(5)) * M_PI / 180.;
+//       yaw_ = -1 * std::stod(nmea.at(2)) * M_PI / 180. + M_PI / 2;
+//       ROS_INFO("PASHR is subscribed.");
+//     }
+//     else if(nmea.at(0).compare(3, 3, "GGA") == 0)
+//     {
+//       position_time_ = std::stod(nmea.at(1));
+//       double lat = std::stod(nmea.at(2));
+//       double lon = std::stod(nmea.at(4));
+//       double h = std::stod(nmea.at(9));
+//       geo_.set_llh_nmea_degrees(lat, lon, h);
+//       ROS_INFO("GGA is subscribed.");
+//     }
+//     else if(nmea.at(0) == "$GPRMC")
+//     {
+//       position_time_ = std::stoi(nmea.at(1));
+//       double lat = std::stod(nmea.at(3));
+//       double lon = std::stod(nmea.at(5));
+//       double h = 0.0;
+//       geo_.set_llh_nmea_degrees(lat, lon, h);
+//       ROS_INFO("GPRMC is subscribed.");
+//     }
+//   }catch (const std::exception &e)
+//   {
+//     ROS_WARN_STREAM("Message is invalid : " << e.what());
+//   }
+// }
+
+// void Nmea2TFPoseNode::callbackFromNmeaSentence(const nmea_msgs::Sentence::ConstPtr &msg)
+// {
+//   current_time_ = msg->header.stamp;
+//   // convert(split(msg->sentence), msg->header.stamp);
+
+//   double timeout = 10.0;
+//   if (fabs(orientation_stamp_.toSec() - msg->header.stamp.toSec()) > timeout)
+//   {
+//     double dt = sqrt(pow(geo_.x() - last_geo_.x(), 2) + pow(geo_.y() - last_geo_.y(), 2));
+//     double threshold = 0.2;
+//     if (dt > threshold)
+//     {
+//       ROS_INFO("QQ is not subscribed. Orientation is created by atan2");
+//       createOrientation();
+//       publishPoseStamped();
+//       publishTF();
+//       last_geo_ = geo_;
+//     }
+//     return;
+//   }
+
+//   double e = 1e-2;
+//   if (fabs(orientation_time_ - position_time_) < e)
+//   {
+//     publishPoseStamped();
+//     publishTF();
+//     return;
+//   }
+// }
+
+void Nmea2TFPoseNode::parsepos(const sensor_msgs::NavSatFix::ConstPtr &pos)
 {
   try
   {
-    if (nmea.at(0).compare(0, 2, "QQ") == 0)
-    {
-      orientation_time_ = stod(nmea.at(3));
-      roll_ = stod(nmea.at(4)) * M_PI / 180.;
-      pitch_ = -1 * stod(nmea.at(5)) * M_PI / 180.;
-      yaw_ = -1 * stod(nmea.at(6)) * M_PI / 180. + M_PI / 2;
-      orientation_stamp_ = current_stamp;
-      ROS_INFO("QQ is subscribed.");
-    }
-    else if (nmea.at(0) == "$PASHR")
-    {
-      orientation_time_ = stod(nmea.at(1));
-      roll_ = stod(nmea.at(4)) * M_PI / 180.;
-      pitch_ = -1 * stod(nmea.at(5)) * M_PI / 180.;
-      yaw_ = -1 * stod(nmea.at(2)) * M_PI / 180. + M_PI / 2;
-      ROS_INFO("PASHR is subscribed.");
-    }
-    else if(nmea.at(0).compare(3, 3, "GGA") == 0)
-    {
-      position_time_ = stod(nmea.at(1));
-      double lat = stod(nmea.at(2));
-      double lon = stod(nmea.at(4));
-      double h = stod(nmea.at(9));
-      geo_.set_llh_nmea_degrees(lat, lon, h);
-      ROS_INFO("GGA is subscribed.");
-    }
-    else if(nmea.at(0) == "$GPRMC")
-    {
-      position_time_ = stoi(nmea.at(1));
-      double lat = stod(nmea.at(3));
-      double lon = stod(nmea.at(5));
-      double h = 0.0;
-      geo_.set_llh_nmea_degrees(lat, lon, h);
-      ROS_INFO("GPRMC is subscribed.");
-    }
+    position_time_ = pos->header.stamp.toSec();
+    double lat = (double)pos->latitude;
+    double lon = (double)pos->longitude;
+    double h = (double)pos->altitude;
+    geo_.set_llh_nmea_degrees(lat, lon, h);
+    ROS_INFO("NavSatFix is subscribed.");
   }catch (const std::exception &e)
   {
     ROS_WARN_STREAM("Message is invalid : " << e.what());
   }
+  return;
 }
 
-void Nmea2TFPoseNode::callbackFromNmeaSentence(const nmea_msgs::Sentence::ConstPtr &msg)
+void Nmea2TFPoseNode::callbackFromNAVSATFIX(const sensor_msgs::NavSatFix::ConstPtr &msg)
 {
+  // update pose stamp.
   current_time_ = msg->header.stamp;
-  convert(split(msg->sentence), msg->header.stamp);
+  parsepos(msg);
+  // Since the msgs are remapped from Ublox, so there will be less latency, we ommit timeout check!
 
-  double timeout = 10.0;
-  if (fabs(orientation_stamp_.toSec() - msg->header.stamp.toSec()) > timeout)
-  {
-    double dt = sqrt(pow(geo_.x() - last_geo_.x(), 2) + pow(geo_.y() - last_geo_.y(), 2));
-    double threshold = 0.2;
-    if (dt > threshold)
-    {
-      ROS_INFO("QQ is not subscribed. Orientation is created by atan2");
-      createOrientation();
-      publishPoseStamped();
-      publishTF();
-      last_geo_ = geo_;
-    }
-    return;
-  }
+  publishPoseStamped();
+  publishTF();
+  return;
+}
 
-  double e = 1e-2;
-  if (fabs(orientation_time_ - position_time_) < e)
+void Nmea2TFPoseNode::parserpy(const ublox_msgs::NavATT::ConstPtr &rpy)
+{
+  try
   {
-    publishPoseStamped();
-    publishTF();
-    return;
+      // orientation_time_ = current_stamp.toSec();
+      // ublox_msgs/navatt has a scale of 1e-5
+      roll_ = (double)rpy->roll * 1e-5 * M_PI / 180.;
+      pitch_ = (double)rpy->pitch * 1e-5 * M_PI / 180.;
+      yaw_ = (double)rpy->heading * 1e-5 * M_PI / 180. + M_PI / 2;
+      ROS_INFO("NavATT is subscribed.");
+
+  }catch (const std::exception &e)
+  {
+    ROS_WARN_STREAM("Message is invalid : " << e.what());
   }
+  return;
+}
+
+void Nmea2TFPoseNode::callbackFromNAVATT(const ublox_msgs::NavATT::ConstPtr &msg){
+  // No Time Stamp is give by Ublox, the iToW is not recommended to use.
+  parserpy(msg);
+  // double dt = sqrt(pow(geo_.x() - last_geo_.x(), 2) + pow(geo_.y() - last_geo_.y(), 2));
+  // double threshold = 0.2;
+  // if (dt > threshold)
+  // {
+    // ROS_INFO("Orientation message seems erroneous. Orientation is created by atan2");
+    // createOrientation();
+  publishPoseStamped();
+  publishTF();
+    // last_geo_ = geo_;
+  // }
+  // else
+  // {
+  //   publishPoseStamped();
+  //   publishTF();
+  // }
+  return;
 }
 
 std::vector<std::string> split(const std::string &string)
