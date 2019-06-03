@@ -7,6 +7,7 @@ find_package(catkin REQUIRED COMPONENTS
         roscpp
         std_msgs
         nmea_msgs
+        ublox_msgs
         gnss
         tf
         )
