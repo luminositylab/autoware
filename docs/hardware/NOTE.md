@@ -26,7 +26,7 @@ Change Publish Message type.
 
 
 
-### Autoware Interfaces and message type
+## Autoware Interfaces and message type
 
 
 Autoware interfaces require GNSS message type to be [**NMEA_Sentence**](http://wiki.ros.org/nmea_msgs),(`nmea2tfpose_core.cpp` in `nmea2tfpose`) There are four sub-message types: `QQ``, $PASHR`, `$GPGGA`, and `$GPRMC`. They are all **nmea/sentences** but contains different information. \
